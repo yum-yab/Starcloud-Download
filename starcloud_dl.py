@@ -33,7 +33,7 @@ def requireEnv(value: T | None, name: str = "value") -> T:
     return value
 
 
-def _indexAlreadyDownloadedFiles(path: Path) -> dict[str, int]:
+def indexAlreadyDownloadedFiles(path: Path) -> dict[str, int]:
     """Create index of already downloaded files.
     Also stores filesize to recognize unfinished downloads.
     """
@@ -102,7 +102,7 @@ class LoginCredentials:
     jwt_token: str
 
 
-def loadCredsFromEnv(envfilePath: str) -> LoginCredentials:
+def loadCredsFromEnv(envfilePath: str | None = None) -> LoginCredentials:
     if not load_dotenv(dotenv_path=envfilePath):
         raise RuntimeError(f".env file with path: '{envfilePath}' could not be found!")
 
@@ -261,7 +261,7 @@ def main() -> None:
 
     outDir = Path(f"{outputDir}/{tileName}")
 
-    downloadedFileIndex: dict[str, int] = _indexAlreadyDownloadedFiles(outDir)
+    downloadedFileIndex: dict[str, int] = indexAlreadyDownloadedFiles(outDir)
 
     try:
         dl_years_for_tile(
