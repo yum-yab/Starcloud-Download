@@ -126,7 +126,7 @@ def loadCredsFromEnv(envfilePath: str | None = None) -> LoginCredentials:
     return LoginCredentials(id, username, jwt_token)
 
 
-def _getFileListPage(tileName: str, year: int) -> list[str]:
+def getFileListPage(tileName: str, year: int) -> dict:
     """Retrieves a list of available tile files for a given tile and year."""
     FILE_PAGE_URL = (
         "https://data-starcloud.pcl.ac.cn/aiforearth/api/data/getFileListByPage"
@@ -145,7 +145,15 @@ def _getFileListPage(tileName: str, year: int) -> list[str]:
         raise RuntimeError(
             f"Could not fetch FileList Page! Code: {response.status_code}, Reason: {response.text}"
         )
-    return [str(resp["file"]) for resp in response.json()["response"]]
+    return response.json()
+
+def get_filenames_for_id(tile_id: str, year: str) -> list[str]:
+
+    resp_json = getFileListPage(tile_id, year)
+    return [str(resp["file"]) for resp in resp_json["response"]]
+
+
+
 
 
 def _getRandomAssSignedFileLink(
@@ -231,7 +239,7 @@ def dl_years_for_tile(
             target_dir.mkdir(exist_ok=True, parents=True)
             logger.debug(f"Created folder: {str(target_dir)}")
 
-        filenameList: list[str] = _getFileListPage(tile_id, year)
+        filenameList: list[str] = get_filenames_for_id(tile_id, year)
 
         logger.info(
             f"Found {len(filenameList)} files for {tile_id} in year {year}! Starting download..."

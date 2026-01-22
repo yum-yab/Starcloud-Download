@@ -23,7 +23,7 @@ print(f"Submitting Slurm array job with {array_size} tasks")
 # --- Build sbatch command ---
 bash_wrapper = Path(__file__).parent / "slurm_wrapper.sh"
 
-limit_concurrent = 50
+limit_concurrent = int(os.getenv("S_LIMIT_CONCURRENT", 10))
 
 sbatch_command = [
     "sbatch",
