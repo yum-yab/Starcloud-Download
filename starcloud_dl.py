@@ -1,4 +1,3 @@
-from multiprocessing.sharedctypes import Value
 from argparse import Namespace
 import argparse
 from dataclasses import dataclass, field
@@ -8,6 +7,7 @@ from dotenv import load_dotenv
 from typing import TypeVar, List, Dict
 from pathlib import Path
 import logging
+import sys
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -19,6 +19,7 @@ logging.basicConfig(
     level=LOG_LEVEL,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
 )
 
 logger = logging.getLogger(__name__)

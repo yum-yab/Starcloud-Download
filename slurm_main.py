@@ -6,6 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logging
 import requests
+import sys
 
 # --- Load .env ---
 load_dotenv()
@@ -17,6 +18,7 @@ logging.basicConfig(
     level=LOG_LEVEL,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,9 +54,9 @@ if __name__ == "__main__":
     else:
         index = None
 
-
-    (f'Tile: {tile_id}, Year: {year}, Index: {index}')
-
+    if index is not None:
+        logger.info(f"Fetched index: {index}")
+    
     try:
         dl_years_for_tile(
             tile_id=tile_id,
