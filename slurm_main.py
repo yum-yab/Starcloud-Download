@@ -4,10 +4,12 @@ import json
 import itertools
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
+import requests
 
+# --- Load .env ---
 load_dotenv()
 
-import logging
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
@@ -53,13 +55,20 @@ if __name__ == "__main__":
 
     (f'Tile: {tile_id}, Year: {year}, Index: {index}')
 
-    dl_years_for_tile(
-        tile_id=tile_id,
-        years=[year],
-        root_dir=root_dir,
-        creds=creds,
-        show_live_progress=False,
-        dl_index=index,
-        # greater chunks for gpfs
-        chunkSize=DEFAULT_CHUNK_SIZE * 4
-    )
+    try:
+        dl_years_for_tile(
+            tile_id=tile_id,
+            years=[year],
+            root_dir=root_dir,
+            creds=creds,
+            show_live_progress=False,
+            dl_index=index,
+            # greater chunks for gpfs
+            chunkSize=DEFAULT_CHUNK_SIZE * 4
+        )
+    except RuntimeError as e:
+        logger.error(e)
+        exit(1)
+    except requests.exceptions.ChunkedEncodingError as e:
+        logger.error(f"Connection reset by server for tile: {tile_id} and year: {year}", e)
+        exit(1)

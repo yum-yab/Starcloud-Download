@@ -165,8 +165,6 @@ def _getRandomAssSignedFileLink(
         "userAccount": creds.username,
         "userId": creds.id,
     }
-    print(auth_header)
-    print(payload)
     response = requests.Response = requests.post(
         LINK_GEN_URL, headers=auth_header, json=payload
     )
@@ -292,6 +290,9 @@ def main() -> None:
         )
     except RuntimeError as e:
         logger.error(e)
+        exit(1)
+    except requests.exceptions.ChunkedEncodingError as e:
+        logger.error(f"Connection reset by server for tile: {tileName}", e)
         exit(1)
 
 
