@@ -255,6 +255,7 @@ def dl_years_for_tile(
                 show_live_progress,
                 chunkSize,
             )
+            logger.info(f"Sucessfully downloaded {filename}!")
 
 
 def main() -> None:
