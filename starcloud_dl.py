@@ -9,6 +9,10 @@ from typing import TypeVar, List, Dict
 from pathlib import Path
 import logging
 
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 logging.basicConfig(
@@ -22,6 +26,16 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 DEFAULT_CHUNK_SIZE: int = 1024 * 1024  # 1Mb default chunk size
+
+
+session = requests.Session()
+retries = Retry(
+    total=5,
+    backoff_factor=1,
+    status_forcelist=[500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
+session.mount("https://", HTTPAdapter(max_retries=retries))
 
 
 def requireEnv(value: T | None, name: str = "value") -> T:
@@ -177,27 +191,31 @@ def _downloadTIFFile(
     isProgressShown: bool = True,
     chunkSize: int = DEFAULT_CHUNK_SIZE,
 ) -> None:
-    response: requests.Response = requests.get(url, stream=True)
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Could not download .tif file! Code: {response.status_code}, Reason: {response.text}"
-        )
-    total = int(response.headers.get("Content-Length", 0))
+    # response: requests.Response = requests.get(url, stream=True)
+    # if response.status_code != 200:
+    #     raise RuntimeError(
+    #         f"Could not download .tif file! Code: {response.status_code}, Reason: {response.text}"
+    #     )
     downloaded = 0
     if not isProgressShown:
         logger.debug(f"[{i}/{fileCount}] Downloading {filename}")
-    with open(outDir / filename, "wb") as f:
-        for chunk in response.iter_content(chunk_size=chunkSize):
-            if chunk:
-                f.write(chunk)
-                downloaded += len(chunk)
-                if isProgressShown:
-                    print(
-                        f"\r[{i}/{fileCount}] Downloading {filename}: {round(downloaded / total * 100, 2)} %",
-                        end="",
-                    )
-        if isProgressShown:
-            print()
+
+    with session.get(url, stream=True) as response:
+        response.raise_for_status()
+        total = int(response.headers.get("Content-Length", 0))
+
+        with open(outDir / filename, "wb") as f:
+            for chunk in response.iter_content(chunk_size=chunkSize):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if isProgressShown:
+                        print(
+                            f"\r[{i}/{fileCount}] Downloading {filename}: {round(downloaded / total * 100, 2)} %",
+                            end="",
+                        )
+            if isProgressShown:
+                print()
 
 
 def dl_years_for_tile(
@@ -225,10 +243,7 @@ def dl_years_for_tile(
                 f, tile_id, year, creds
             )
 
-            if (
-                dl_index is not None
-                and dl_index.get(filename, -1) == fileSize
-            ):
+            if dl_index is not None and dl_index.get(filename, -1) == fileSize:
                 logger.info(
                     f"File {filename} has already been donwloaded, going to next file... "
                 )
@@ -278,8 +293,6 @@ def main() -> None:
     except RuntimeError as e:
         logger.error(e)
         exit(1)
-
-
 
 
 if __name__ == "__main__":

@@ -23,9 +23,11 @@ print(f"Submitting Slurm array job with {array_size} tasks")
 # --- Build sbatch command ---
 bash_wrapper = Path(__file__).parent / "slurm_wrapper.sh"
 
+limit_concurrent = 50
+
 sbatch_command = [
     "sbatch",
-    f"--array=0-{array_size-1}",
+    f"--array=0-{array_size-1}%{limit_concurrent}",
     "--export=ALL",
     str(bash_wrapper),
 ]
@@ -34,3 +36,4 @@ sbatch_command = [
 print("Running:", " ".join(sbatch_command))
 result = subprocess.run(sbatch_command, check=True, capture_output=True, text=True)
 print(result.stdout)
+print(result.stderr)
