@@ -3,7 +3,6 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from itertools import product
 from dotenv import load_dotenv
 
 # --- Load .env ---

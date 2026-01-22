@@ -2,9 +2,16 @@
 ## Setup
 Most easy python installation you could imagine.
 It's as easy as running:
+
 ```sh
-python3 -m venv env
-source env/bin/activate
+uv sync
+```
+
+or
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
 pip3 install -r requirements.txt
 ```
 
@@ -50,7 +57,7 @@ To do this, follow these steps:
 ## How to use it
 It is as simple as running:
 ```sh
-python3 main.py TILE_NUMBER
+python3 starcloud_dl.py TILE_NUMBER
 ```
 The tool then downloads all tile from 2000-2022 (the years can be configured as parameters).
 
@@ -63,7 +70,7 @@ If you change the output dir with the `-o` parameter you need to pay attention t
 
 A simple way to download multiple tiles at the same time would be i.e.:
 ```sh
-cat tiles.txt | xargs -n1 -P 4 python3 main.py --no-progress
+cat tiles.txt | xargs -n1 -P 4 python3 starcloud_dl.py --no-progress
 ```
 Assuming that `tiles.txt` is a simple text file containing multiple tile names in the following format:
 ```txt

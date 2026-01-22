@@ -97,18 +97,18 @@ def _getCLIArgs() -> Namespace:
 
 @dataclass
 class LoginCredentials:
-    id: int = field()
+    id: str = field()
     username: str
     jwt_token: str
 
 
 def loadCredsFromEnv(envfilePath: str | None = None) -> LoginCredentials:
-    if not load_dotenv(dotenv_path=envfilePath):
+    if not load_dotenv(dotenv_path=envfilePath, override=True):
         raise RuntimeError(f".env file with path: '{envfilePath}' could not be found!")
 
-    username: str = requireEnv(os.getenv("USERNAME"), "USERNAME")
-    jwt_token: str = requireEnv(os.getenv("JWT"), "JWT")
-    id: str = requireEnv(os.getenv("ID"), "ID")
+    username: str = requireEnv(os.getenv("SC_USER"), "SC_USER")
+    jwt_token: str = requireEnv(os.getenv("SC_JWT"), "SC_JWT")
+    id: str = requireEnv(os.getenv("SC_ID"), "SC_ID")
     return LoginCredentials(id, username, jwt_token)
 
 
@@ -151,6 +151,8 @@ def _getRandomAssSignedFileLink(
         "userAccount": creds.username,
         "userId": creds.id,
     }
+    print(auth_header)
+    print(payload)
     response = requests.Response = requests.post(
         LINK_GEN_URL, headers=auth_header, json=payload
     )

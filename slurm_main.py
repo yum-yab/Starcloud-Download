@@ -1,14 +1,28 @@
-from .starcloud_dl import dl_years_for_tile, loadCredsFromEnv, DEFAULT_CHUNK_SIZE, indexAlreadyDownloadedFiles
+from starcloud_dl import dl_years_for_tile, loadCredsFromEnv, DEFAULT_CHUNK_SIZE, indexAlreadyDownloadedFiles
 import os
 import json
 import itertools
 from pathlib import Path
+from dotenv import load_dotenv
 
+load_dotenv()
+
+import logging
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
 
-
+    working_dir = Path(os.environ.get("SLURM_SUBMIT_DIR", "."))
     root_dir = Path(os.getenv("S_ROOT_DIR"))
 
     slurm_array_job_id = os.getenv("SLURM_ARRAY_TASK_ID")
@@ -26,16 +40,18 @@ if __name__ == "__main__":
     slurm_tiles = json.loads(os.environ["S_TILES"])
     slurm_years = json.loads(os.environ["S_YEARS"])
 
-    tile_id, year = itertools.product(slurm_tiles, slurm_years)[slurm_array_job_id]
+    tile_id, year = list(itertools.product(slurm_tiles, slurm_years))[slurm_array_job_id]
 
-    creds = loadCredsFromEnv(".env")
+    creds = loadCredsFromEnv(working_dir / ".env")
 
     if bool(os.getenv("S_CREATE_INDEX")):
-        index = indexAlreadyDownloadedFiles(root_dir)
+        # create index from one dir since were not going to dl more anyway
+        index = indexAlreadyDownloadedFiles(root_dir / str(year) / tile_id)
     else:
         index = None
 
 
+    (f'Tile: {tile_id}, Year: {year}, Index: {index}')
 
     dl_years_for_tile(
         tile_id=tile_id,
