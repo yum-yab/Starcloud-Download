@@ -5,8 +5,19 @@ from dataclasses import dataclass, field
 import requests
 import os
 from dotenv import load_dotenv
-from typing import TypeVar
+from typing import TypeVar, List, Dict
 from pathlib import Path
+import logging
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -91,7 +102,7 @@ class LoginCredentials:
     jwt_token: str
 
 
-def _loadCredsFromEnv(envfilePath: str) -> LoginCredentials:
+def loadCredsFromEnv(envfilePath: str) -> LoginCredentials:
     if not load_dotenv(dotenv_path=envfilePath):
         raise RuntimeError(f".env file with path: '{envfilePath}' could not be found!")
 
@@ -172,7 +183,7 @@ def _downloadTIFFile(
     total = int(response.headers.get("Content-Length", 0))
     downloaded = 0
     if not isProgressShown:
-        print(f"[{i}/{fileCount}] Downloading {filename}")
+        logger.debug(f"[{i}/{fileCount}] Downloading {filename}")
     with open(outDir / filename, "wb") as f:
         for chunk in response.iter_content(chunk_size=chunkSize):
             if chunk:
@@ -185,6 +196,50 @@ def _downloadTIFFile(
                     )
         if isProgressShown:
             print()
+
+
+def dl_years_for_tile(
+    tile_id: str,
+    years: List[str],
+    root_dir: Path,
+    creds: LoginCredentials,
+    dl_index: Dict[str, int] | None = None,
+    show_live_progress: bool = True,
+    chunkSize: int = DEFAULT_CHUNK_SIZE,
+):
+    for year in years:
+        target_dir: Path = root_dir / str(year) / tile_id
+        if not target_dir.exists():
+            target_dir.mkdir(exist_ok=True, parents=True)
+            logger.debug(f"Created folder: {str(target_dir)}")
+
+        filenameList: list[str] = _getFileListPage(tile_id, year)
+
+        logger.info(
+            f"Found {len(filenameList)} files for {tile_id} in year {year}! Starting download..."
+        )
+        for i, f in enumerate(filenameList):
+            (filename, signedURL, fileSize) = _getRandomAssSignedFileLink(
+                f, tile_id, year, creds
+            )
+
+            if (
+                dl_index is not None
+                and dl_index.get(filename, -1) == fileSize
+            ):
+                logger.info(
+                    f"File {filename} has already been donwloaded, going to next file... "
+                )
+                continue
+            _downloadTIFFile(
+                signedURL,
+                target_dir,
+                filename,
+                i + 1,
+                len(filenameList),
+                show_live_progress,
+                chunkSize,
+            )
 
 
 def main() -> None:
@@ -202,45 +257,27 @@ def main() -> None:
             "Argument '--start-year' must not be larger than '--end-year'!"
         )
 
-    creds: LoginCredentials = _loadCredsFromEnv(envFile)
+    creds: LoginCredentials = loadCredsFromEnv(envFile)
 
     outDir = Path(f"{outputDir}/{tileName}")
 
     downloadedFileIndex: dict[str, int] = _indexAlreadyDownloadedFiles(outDir)
 
-    for year in range(startYear, endYear + 1):
-        yearDir: Path = outDir / str(year)
-        if not yearDir.exists():
-            yearDir.mkdir(exist_ok=True, parents=True)
-            print(f"Created folder: {str(yearDir)}")
-
-        filenameList: list[str] = _getFileListPage(tileName, year)
-
-        print(
-            f"Found {len(filenameList)} files for {tileName} in year {year}! Starting download..."
+    try:
+        dl_years_for_tile(
+            tileName,
+            range(startYear, endYear + 1),
+            outDir,
+            creds,
+            downloadedFileIndex,
+            isProgressShown,
+            chunkSize,
         )
-        for i, f in enumerate(filenameList):
-            (filename, signedURL, fileSize) = _getRandomAssSignedFileLink(
-                f, tileName, year, creds
-            )
+    except RuntimeError as e:
+        logger.error(e)
+        exit(1)
 
-            if (
-                filename in downloadedFileIndex
-                and downloadedFileIndex[filename] == fileSize
-            ):
-                print(
-                    f"File {filename} has already been donwloaded, going to next file... "
-                )
-                continue
-            _downloadTIFFile(
-                signedURL,
-                yearDir,
-                filename,
-                i + 1,
-                len(filenameList),
-                isProgressShown,
-                chunkSize,
-            )
+
 
 
 if __name__ == "__main__":
