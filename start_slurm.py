@@ -29,7 +29,7 @@ bash_wrapper = Path(__file__).parent / "slurm_wrapper.sh"
 
 limit_concurrent = int(os.getenv("S_LIMIT_CONCURRENT", 10))
 
-job_name = f"csdc_dl_{'_'.join(years)}" 
+job_name = f"csdc_dl_{'_'.join(map(str, years))}" 
 
 log_base = f"/work/{current_user}/logs/csdc_dl/{job_name}"
 
