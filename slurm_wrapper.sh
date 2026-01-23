@@ -1,7 +1,4 @@
 #!/bin/bash
-#SBATCH --job-name=csdc_dl
-#SBATCH --output=/work/%u/logs/csdc_dl/%x-%A_%a.log
-#SBATCH --error=/work/%u/logs/csdc_dl/%x-%A_%a.error
 
 #SBATCH --time=0-01:00:00
 #SBATCH --mem-per-cpu=1G

@@ -1,5 +1,5 @@
 from requests.sessions import Session
-
+from sc_login import AuthData, LoginCredentials, performLogin
 
 from logging import Logger
 
@@ -10,11 +10,12 @@ from dataclasses import dataclass, field
 import requests
 import os
 from dotenv import load_dotenv
-from typing import TypeVar
+from typing import Any, Generator, TypeVar
 from pathlib import Path
 import logging
 import sys
 import time
+import numpy as np
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -33,17 +34,30 @@ logger: Logger = logging.getLogger(name=__name__)
 
 T = TypeVar(name="T")
 
+A = TypeVar(name="A")
+
 DEFAULT_CHUNK_SIZE: int = 1024 * 1024  # 1Mb default chunk size
 
+def _split_into_n(seq: list[A], n_parts: int) -> list[list[A]]:
+    k, m = divmod(len(seq), n_parts)
+    return [
+        seq[i*k + min(i, m):(i+1)*k + min(i+1, m)]
+        for i in range(n_parts)
+    ]
 
-session: Session = requests.Session()
-retries: Retry = Retry(
-    total=5,
-    backoff_factor=1,
-    status_forcelist=[500, 502, 503, 504],
-    allowed_methods=["GET"],
-)
-session.mount(prefix="https://", adapter=HTTPAdapter(max_retries=retries))
+
+
+@dataclass
+class ListSplitChoose:
+    i: int
+    n: int
+
+    def get_sublist(self, seq: list[A]) -> list[A]:
+        
+        return list[list[A]](_split_into_n(seq=seq, n_parts=self.n))[self.i]
+
+
+
 
 
 def requireEnv(value: T | None, name: str = "value") -> T:
@@ -67,6 +81,14 @@ def indexAlreadyDownloadedFiles(path: Path) -> dict[str, int]:
             fileIndex[file.name] = fileSize
     return fileIndex
 
+
+
+def loadCredsFromEnv(envfilePath: Path | str) -> LoginCredentials:
+    if not load_dotenv(dotenv_path=envfilePath):
+        raise RuntimeError(f".env file with path: '{envfilePath}' could not be found!")
+    email: str = requireEnv(os.getenv("STAR_EMAIL"), "STAR_EMAIL")
+    password: str = requireEnv(os.getenv("STAR_PASSWORD"), "STAR_PASSWORD")
+    return LoginCredentials(email, password)
 
 def _getCLIArgs() -> Namespace:
     parser: ArgumentParser = argparse.ArgumentParser(
@@ -117,23 +139,6 @@ def _getCLIArgs() -> Namespace:
     return parser.parse_args()
 
 
-@dataclass
-class LoginCredentials:
-    id: str = field()
-    username: str
-    jwt_token: str
-
-
-def loadCredsFromEnv(envfilePath: Path | str | None = None) -> LoginCredentials:
-    if not load_dotenv(dotenv_path=envfilePath, override=True):
-        raise RuntimeError(f".env file with path: '{envfilePath}' could not be found!")
-
-    username: str = requireEnv(value=os.getenv("SC_USER"), name="SC_USER")
-    jwt_token: str = requireEnv(value=os.getenv("SC_JWT"), name="SC_JWT")
-    id: str = requireEnv(value=os.getenv("SC_ID"), name="SC_ID")
-    return LoginCredentials(id, username, jwt_token)
-
-
 def getFileListPage(tileName: str, year: int) -> dict[str, list[dict[str, int | str]]]:
     """Retrieves a list of available tile files for a given tile and year."""
     FILE_PAGE_URL = (
@@ -155,34 +160,48 @@ def getFileListPage(tileName: str, year: int) -> dict[str, list[dict[str, int | 
         )
     return response.json()  # pyright: ignore[reportAny]
 
-def get_filenames_for_id(tile_id: str, year: int, index: dict[str, int] | None = None) -> list[str]:
 
-    resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(tileName=tile_id, year=year)
+def get_filenames_for_id(
+    tile_id: str,
+    year: int,
+    index: dict[str, int] | None = None,
+    list_split_chooser: ListSplitChoose | None = None,
+) -> list[str]:
+    resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(
+        tileName=tile_id, year=year
+    )
+
+    list_of_file_dicts = resp_json["response"]
+
+    if list_split_chooser is not None:
+        list_of_file_dicts = list_split_chooser.get_sublist(seq=list_of_file_dicts)
+
     if index is None:
-        return [str(resp["file"]) for resp in resp_json["response"]]
+        return [str(resp["file"]) for resp in list_of_file_dicts]
     else:
-        return [str(resp["file"]) for resp in resp_json["response"] if index.get(str(resp['file']), -10) != resp['size']]
-
-
-
+        return [
+            str(resp["file"])
+            for resp in list_of_file_dicts
+            if index.get(str(resp["file"]), -10) != resp["size"]
+        ]
 
 
 def _getRandomAssSignedFileLink(
-    filename: str, tileName: str, year: int, creds: LoginCredentials
+    filename: str, tileName: str, year: int, auth: AuthData
 ) -> tuple[str, str, int]:
     """Retrieves a signed file URL and its file size based on a tileName and given filename. This URL can be used to download the file."""
     LINK_GEN_URL = (
         "https://data-starcloud.pcl.ac.cn/starcloud/api/file/downloadResource"
     )
     OBJECT_KEY: str = f"shared-dataset/CSDC_samples/CSDC_samples/SDC_V003/{tileName}/{year}/{filename}"
-    auth_header: dict[str, str] = {"Authorization": f"Bearer {creds.jwt_token}"}
+    auth_header: dict[str, str] = {"Authorization": f"Bearer {auth.token}"}
     payload: dict[str, int | str] = {
         "country": "Germany",
         "objectKey": OBJECT_KEY,
         "resourceId": 26,
         "resourceType": "REMOTE_SENSING",
-        "userAccount": creds.username,
-        "userId": creds.id,
+        "userAccount": auth.userName,
+        "userId": auth.id,
     }
     response: requests.Response = requests.post(
         url=LINK_GEN_URL, headers=auth_header, json=payload
@@ -217,7 +236,7 @@ def _downloadTIFFile(
     if not isProgressShown:
         logger.debug(f"[{i}/{fileCount}] Downloading {filename}")
 
-    with session.get(url, stream=True) as response:
+    with requests.get(url, stream=True) as response:
         response.raise_for_status()
         total = int(response.headers.get("Content-Length", 0))
 
@@ -239,11 +258,12 @@ def dl_years_for_tile(
     tile_id: str,
     years: list[int],
     root_dir: Path,
-    creds: LoginCredentials,
+    auth: AuthData,
     dl_index: dict[str, int] | None = None,
     show_live_progress: bool = True,
     log_time: bool = True,
     chunkSize: int = DEFAULT_CHUNK_SIZE,
+    list_split_chooser: ListSplitChoose | None = None,
 ) -> None:
     for year in years:
         target_dir: Path = root_dir / str(year) / tile_id
@@ -253,20 +273,25 @@ def dl_years_for_tile(
 
         start_acc: float = time.perf_counter()
 
-        filenameList: list[str] = get_filenames_for_id(tile_id, year, index=dl_index)
+        filenameList: list[str] = get_filenames_for_id(tile_id, year, index=dl_index, list_split_chooser=list_split_chooser)
         if log_time:
+            logger.info(
+                msg=f"Perf File List: {(time.perf_counter() - start_acc):.2f} s"
+            )
 
-            logger.info(msg=f'Perf File List: {(time.perf_counter() - start_acc):.2f} s')
-
-        logger.info(
-            msg=f"Found {len(filenameList)} files for {tile_id} in year {year}! Starting download..."
-        )
+        if len(filenameList) == 0:
+            logger.info(f"No files left for {tile_id} in {year} {list_split_chooser}. Ending download....")
+            return
+        else:
+            logger.info(
+                msg=f"Found {len(filenameList)} files for {tile_id} in year {year}! Starting download..."
+            )
+        
         for i, f in enumerate[str](filenameList):
-
             t_file_start: float = time.perf_counter()
 
             (filename, signedURL, fileSize) = _getRandomAssSignedFileLink(
-                filename=f, tileName=tile_id, year=year, creds=creds
+                filename=f, tileName=tile_id, year=year, auth=auth
             )
 
             t_got_file_link: float = time.perf_counter()
@@ -288,9 +313,10 @@ def dl_years_for_tile(
 
             t_downloaded: float = time.perf_counter()
 
-
             if log_time:
-                logger.info(msg=f'Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s')
+                logger.info(
+                    msg=f"Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s"
+                )
             logger.info(msg=f"Successfully downloaded {filename}!")
 
 
@@ -309,7 +335,9 @@ def main() -> None:
             "Argument '--start-year' must not be larger than '--end-year'!"
         )
 
-    creds: LoginCredentials = loadCredsFromEnv(envfilePath=envFile)
+    creds: LoginCredentials = loadCredsFromEnv(envFile)
+    authData: AuthData = performLogin(creds)
+    outDir = Path(f"{outputDir}/{tileName}")
 
     outDir: Path = Path(f"{outputDir}/{tileName}")
 
@@ -320,7 +348,7 @@ def main() -> None:
             tile_id=tileName,
             years=list[int](range(startYear, endYear + 1)),
             root_dir=outDir,
-            creds=creds,
+            auth=authData,
             dl_index=downloadedFileIndex,
             show_live_progress=isProgressShown,
             log_time=chunkSize,

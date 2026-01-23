@@ -1,9 +1,3 @@
-from pandas.core.frame import DataFrame
-from pandas.core.frame import DataFrame
-from pandas.core.frame import DataFrame
-
-
-from typing import Any
 import json
 
 from starcloud_dl import getFileListPage, indexAlreadyDownloadedFiles
@@ -80,12 +74,13 @@ GERMAN_TILES: list[str] = [
     "33UVQ",
 ]
 
-def validate_tile_year(path: Path, year: int, tile_id: str, print_stats: bool = True) -> pd.DataFrame:
 
+def validate_tile_year(
+    path: Path, year: int, tile_id: str, print_stats: bool = True
+) -> pd.DataFrame:
     if str(path).endswith(tile_id):
         path: Path = path / tile_id
 
-    
     res: list[dict[str, str | int]] = []
 
     response: dict[str, list[dict[str, int | str]]] = getFileListPage(
@@ -118,26 +113,26 @@ def validate_tile_year(path: Path, year: int, tile_id: str, print_stats: bool = 
 
         res.append(tile_response)
 
-    df: DataFrame = pd.DataFrame(res)
+    df: pd.DataFrame = pd.DataFrame(res)
 
     if print_stats:
         print_all_status_percentages(df)
-    
+
     return df
 
 
-
 def validate_year(path: Path, year: int, print_stats: bool = True) -> pd.DataFrame:
-    if not str(path).endswith(str(year)):
-        path: Path = path / str(year)
+    index_path: Path = path if str(path).endswith(str(year)) else path / str(year)
 
     res: list[pd.DataFrame] = []
 
     for tile_id in GERMAN_TILES:
         try:
-            tile_df: DataFrame = validate_tile_year(path, year, tile_id, print_stats=False)
+            tile_df: pd.DataFrame = validate_tile_year(
+                path=index_path, year=year, tile_id=tile_id, print_stats=False
+            )
         except Exception as e:
-            print(f'ERROR: Could not validate {year}, {tile_id}. Reason: {str(e)}')
+            print(f"ERROR: Could not validate {year}, {tile_id}. Reason: {str(e)}")
             continue
 
         res.append(tile_df)
@@ -150,7 +145,7 @@ def validate_year(path: Path, year: int, print_stats: bool = True) -> pd.DataFra
 
 
 def print_all_status_percentages(df: pd.DataFrame) -> None:
-    stats: DataFrame = (
+    stats: pd.DataFrame = (
         df.groupby(["tile", "year", "status"])
         .size()
         .groupby(level=[0, 1])
@@ -169,7 +164,6 @@ if __name__ == "__main__":
     root_dir: Path = Path(sys.argv[1])
     time_str: str = datetime.now().strftime(format="%Y-%m-%d_%H-%M")
 
-
     years_to_check: list[int] = [int(y) for y in sys.argv[2:]]
 
     dfs: list[pd.DataFrame] = []
@@ -181,14 +175,16 @@ if __name__ == "__main__":
 
     final_df: pd.DataFrame = pd.concat(dfs)
 
+    file_name: str = (
+        f"csdc_dl_completeness_{time_str}_{'_'.join(map(str, years_to_check))}.csv"
+    )
 
-    file_name: str = f'csdc_dl_completeness_{time_str}_{"_".join(map(str, years_to_check))}.csv'
-
-    print(f'Writing completness report to {file_name}')
+    print(f"Writing completness report to {file_name}")
     final_df.to_csv(file_name)
 
     if len(years_to_check) == 1:
-
-        incomplete_tiles: list[str] = final_df[final_df["status"] != "complete"]["tile"].unique().tolist()
+        incomplete_tiles: list[str] = (
+            final_df[final_df["status"] != "complete"]["tile"].unique().tolist()
+        )
 
         print(f"Incomplete tiles: {json.dumps(obj=incomplete_tiles)}")
