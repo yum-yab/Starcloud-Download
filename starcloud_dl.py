@@ -290,7 +290,7 @@ def dl_years_for_tile(
 
 
             if log_time:
-                logger.info(msg=f'Perf FileLink,Download: {(t_downloaded - t_got_file_link):.2f},{(t_got_file_link - t_file_start):.2f} s')
+                logger.info(msg=f'Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s')
             logger.info(msg=f"Successfully downloaded {filename}!")
 
 

@@ -167,7 +167,7 @@ if __name__ == "__main__":
     from datetime import datetime
 
     root_dir: Path = Path(sys.argv[1])
-    time_str: str = datetime.now().strftime(format="%Y-%m-%d_%H:%M")
+    time_str: str = datetime.now().strftime(format="%Y-%m-%d_%H-%M")
 
 
     years_to_check: list[int] = [int(y) for y in sys.argv[2:]]
@@ -189,6 +189,6 @@ if __name__ == "__main__":
 
     if len(years_to_check) == 1:
 
-        incomplete_tiles: list[str] = final_df[final_df["status"] != "complete"]["tile_id"].unique().tolist()
+        incomplete_tiles: list[str] = final_df[final_df["status"] != "complete"]["tile"].unique().tolist()
 
         print(f"Incomplete tiles: {json.dumps(obj=incomplete_tiles)}")
