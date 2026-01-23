@@ -155,10 +155,13 @@ def getFileListPage(tileName: str, year: int) -> dict[str, list[dict[str, int | 
         )
     return response.json()  # pyright: ignore[reportAny]
 
-def get_filenames_for_id(tile_id: str, year: int) -> list[str]:
+def get_filenames_for_id(tile_id: str, year: int, index: dict[str, int] | None = None) -> list[str]:
 
     resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(tileName=tile_id, year=year)
-    return [str(resp["file"]) for resp in resp_json["response"]]
+    if index is None:
+        return [str(resp["file"]) for resp in resp_json["response"]]
+    else:
+        return [str(resp["file"]) for resp in resp_json["response"] if index.get(str(resp['file']), -10) != resp['size']]
 
 
 
@@ -241,7 +244,7 @@ def dl_years_for_tile(
     show_live_progress: bool = True,
     log_time: bool = True,
     chunkSize: int = DEFAULT_CHUNK_SIZE,
-):
+) -> None:
     for year in years:
         target_dir: Path = root_dir / str(year) / tile_id
         if not target_dir.exists():
@@ -250,7 +253,7 @@ def dl_years_for_tile(
 
         start_acc: float = time.perf_counter()
 
-        filenameList: list[str] = get_filenames_for_id(tile_id, year)
+        filenameList: list[str] = get_filenames_for_id(tile_id, year, index=dl_index)
         if log_time:
 
             logger.info(msg=f'Perf File List: {(time.perf_counter() - start_acc):.2f} s')
@@ -310,7 +313,7 @@ def main() -> None:
 
     outDir: Path = Path(f"{outputDir}/{tileName}")
 
-    downloadedFileIndex: dict[str, int] = indexAlreadyDownloadedFiles(outDir)
+    downloadedFileIndex: dict[str, int] = indexAlreadyDownloadedFiles(path=outDir)
 
     try:
         dl_years_for_tile(
