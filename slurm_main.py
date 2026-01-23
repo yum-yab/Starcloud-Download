@@ -72,5 +72,5 @@ if __name__ == "__main__":
         logger.error(e)
         exit(1)
     except requests.exceptions.ChunkedEncodingError as e:
-        logger.error(f"Connection reset by server for tile: {tile_id} and year: {year}", e)
+        logger.error(f"Connection reset by server for tile: {tile_id} and year: {year}")
         exit(1)

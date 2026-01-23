@@ -8,6 +8,7 @@ from typing import TypeVar, List, Dict
 from pathlib import Path
 import logging
 import sys
+import time
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -232,6 +233,7 @@ def dl_years_for_tile(
     creds: LoginCredentials,
     dl_index: Dict[str, int] | None = None,
     show_live_progress: bool = True,
+    log_time: bool = True,
     chunkSize: int = DEFAULT_CHUNK_SIZE,
 ):
     for year in years:
@@ -240,15 +242,28 @@ def dl_years_for_tile(
             target_dir.mkdir(exist_ok=True, parents=True)
             logger.debug(f"Created folder: {str(target_dir)}")
 
+        start_acc = time.perf_counter()
+
         filenameList: list[str] = get_filenames_for_id(tile_id, year)
+        if log_time:
+
+            logger.info(f'Perf File List: {(time.perf_counter() - start_acc):.2f} s')
 
         logger.info(
             f"Found {len(filenameList)} files for {tile_id} in year {year}! Starting download..."
         )
         for i, f in enumerate(filenameList):
+
+            t_file_start = time.perf_counter()
+
             (filename, signedURL, fileSize) = _getRandomAssSignedFileLink(
                 f, tile_id, year, creds
             )
+
+            t_got_file_link = time.perf_counter() - t_file_start
+
+            if log_time:
+                logger.info(f'Perf Get File Link: {t_got_file_link:.2f} s')
 
             if dl_index is not None and dl_index.get(filename, -1) == fileSize:
                 logger.info(
@@ -264,6 +279,9 @@ def dl_years_for_tile(
                 show_live_progress,
                 chunkSize,
             )
+
+            if log_time:
+                logger.info(f'Perf Download: {(time.perf_counter() - t_got_file_link):.2f} s')
             logger.info(f"Sucessfully downloaded {filename}!")
 
 
@@ -302,7 +320,7 @@ def main() -> None:
         logger.error(e)
         exit(1)
     except requests.exceptions.ChunkedEncodingError as e:
-        logger.error(f"Connection reset by server for tile: {tileName}", e)
+        logger.error(f"Connection reset by server for tile: {tileName}")
         exit(1)
 
 

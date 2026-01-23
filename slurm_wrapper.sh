@@ -3,7 +3,7 @@
 #SBATCH --output=/work/%u/logs/csdc_dl/%x-%A_%a.log
 #SBATCH --error=/work/%u/logs/csdc_dl/%x-%A_%a.error
 
-#SBATCH --time=0-00:40:00
+#SBATCH --time=0-01:00:00
 #SBATCH --mem-per-cpu=1G
 #SBATCH -c 1
 
