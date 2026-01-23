@@ -260,10 +260,7 @@ def dl_years_for_tile(
                 f, tile_id, year, creds
             )
 
-            t_got_file_link = time.perf_counter() - t_file_start
-
-            if log_time:
-                logger.info(f'Perf Get File Link: {t_got_file_link:.2f} s')
+            t_got_file_link = time.perf_counter()
 
             if dl_index is not None and dl_index.get(filename, -1) == fileSize:
                 logger.info(
@@ -280,8 +277,11 @@ def dl_years_for_tile(
                 chunkSize,
             )
 
+            t_downloaded = time.perf_counter()
+
+
             if log_time:
-                logger.info(f'Perf Download: {(time.perf_counter() - t_got_file_link):.2f} s')
+                logger.info(f'Perf FileLink,Download: {(t_downloaded - t_got_file_link):.2f},{(t_got_file_link - t_file_start):.2f} s')
             logger.info(f"Sucessfully downloaded {filename}!")
 
 
