@@ -68,9 +68,9 @@ def indexAlreadyDownloadedFiles(path: Path) -> dict[str, int]:
     """Create index of already downloaded files.
     Also stores filesize to recognize unfinished downloads.
     """
-    print(f"Creating index of already downloaded files in '{path}' ...")
+    logger.debug(f"Creating index of already downloaded files in '{path}' ...")
     fileIndex: dict[str, int] = {}
-    for file in path.rglob("*"):
+    for file in path.rglob("*.tif"):
         if file.is_file():
             fileSize: int = file.stat().st_size
             fileIndex[file.name] = fileSize

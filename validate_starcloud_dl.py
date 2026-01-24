@@ -1,8 +1,9 @@
 import json
+import select
 
 from starcloud_dl import getFileListPage, indexAlreadyDownloadedFiles
-import pandas as pd
 from pathlib import Path
+import polars as pl
 
 GERMAN_TILES: list[str] = [
     "31UFS",
@@ -77,7 +78,7 @@ GERMAN_TILES: list[str] = [
 
 def validate_tile_year(
     path: Path, year: int, tile_id: str, print_stats: bool = True
-) -> pd.DataFrame:
+) -> pl.DataFrame:
     if str(path).endswith(tile_id):
         path: Path = path / tile_id
 
@@ -113,23 +114,23 @@ def validate_tile_year(
 
         res.append(tile_response)
 
-    df: pd.DataFrame = pd.DataFrame(res)
+    df: pl.DataFrame = pl.DataFrame(res)
 
     if print_stats:
-        print_all_status_percentages(df)
+        print_completeness_percentage(df)
 
     return df
 
 
-def validate_year(path: Path, year: int, print_stats: bool = True) -> pd.DataFrame:
+def validate_year(path: Path, year: int, print_stats: bool = True) -> pl.DataFrame:
     index_path: Path = path if str(path).endswith(str(year)) else path / str(year)
 
-    res: list[pd.DataFrame] = []
+    res: list[pl.DataFrame] = []
 
     for tile_id in GERMAN_TILES:
         try:
-            tile_df: pd.DataFrame = validate_tile_year(
-                path=index_path, year=year, tile_id=tile_id, print_stats=False
+            tile_df: pl.DataFrame = validate_tile_year(
+                path=index_path, year=year, tile_id=tile_id, print_stats=print_stats
             )
         except Exception as e:
             print(f"ERROR: Could not validate {year}, {tile_id}. Reason: {str(e)}")
@@ -137,24 +138,28 @@ def validate_year(path: Path, year: int, print_stats: bool = True) -> pd.DataFra
 
         res.append(tile_df)
 
-    df: pd.DataFrame = pd.concat(res)
+    df = pl.concat(res)
 
     if print_stats:
-        print_all_status_percentages(df)
+        print_completeness_percentage(df)
     return df
 
 
-def print_all_status_percentages(df: pd.DataFrame) -> None:
-    stats: pd.DataFrame = (
-        df.groupby(["tile", "year", "status"])
-        .size()
-        .groupby(level=[0, 1])
-        .apply(func=lambda s: s / s.sum() * 100)
-        .rename("pct")
-        .reset_index()
+def print_completeness_percentage(df: pl.DataFrame) -> None:
+
+    completeness_stats = df.group_by(['year', 'tile', 'status']).len().with_columns(
+        (pl.col('len') / pl.sum('len').over(['year', 'tile'])).alias("pct")
     )
 
-    print(stats)
+    comp = completeness_stats.filter(
+        (pl.col('status') == "complete") 
+    )
+
+    completeness = comp['pct'].sum() / comp['pct'].len() * 100
+
+    print(f'Completeness: {completeness:.3f} %')
+
+
 
 
 if __name__ == "__main__":
@@ -166,25 +171,25 @@ if __name__ == "__main__":
 
     years_to_check: list[int] = [int(y) for y in sys.argv[2:]]
 
-    dfs: list[pd.DataFrame] = []
+    dfs: list[pl.DataFrame] = []
 
     for year in years_to_check:
-        df: pd.DataFrame = validate_year(path=root_dir, year=year, print_stats=False)
+        df = validate_year(path=root_dir, year=year, print_stats=True)
 
         dfs.append(df)
 
-    final_df: pd.DataFrame = pd.concat(dfs)
+    final_df = pl.concat(dfs)
 
     file_name: str = (
         f"csdc_dl_completeness_{time_str}_{'_'.join(map(str, years_to_check))}.csv"
     )
 
     print(f"Writing completness report to {file_name}")
-    final_df.to_csv(file_name)
+    final_df.write_csv(file_name)
 
     if len(years_to_check) == 1:
         incomplete_tiles: list[str] = (
-            final_df[final_df["status"] != "complete"]["tile"].unique().tolist()
+            final_df.filter(pl.col('status') != 'complete').get_column('tile').unique().to_list()
         )
 
         print(f"Incomplete tiles: {json.dumps(obj=incomplete_tiles)}")
