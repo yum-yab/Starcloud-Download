@@ -4,6 +4,21 @@ import base64
 import requests
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
+import logging 
+import os
+import sys
+
+LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
+
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
+
+logger: logging.Logger = logging.getLogger(name=__name__)
+
 
 PUBLIC_KEY_PEM = """-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvrzz4DGWHc6YmK0BZ30LMqZv
@@ -58,7 +73,7 @@ def performLogin(creds: LoginCredentials) -> AuthData:
     )
 
     response.raise_for_status()
-    print("Login Successful")
+    logger.info("Login Successful")
     response_body = response.json()
     return AuthData(
         id=response_body["data"]["id"],
