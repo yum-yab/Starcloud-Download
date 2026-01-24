@@ -1,7 +1,7 @@
 from logging import Logger
 
 
-from starcloud_dl import dl_years_for_tile, loadCredsFromEnv, DEFAULT_CHUNK_SIZE, indexAlreadyDownloadedFiles, ListSplitChoose
+from starcloud_dl import loadCredsFromEnv, DEFAULT_CHUNK_SIZE, indexAlreadyDownloadedFiles, ListSplitChoose, get_filenames_for_id, dl_file_list
 from sc_login import LoginCredentials, AuthData, performLogin
 import os
 import json
@@ -57,7 +57,6 @@ if __name__ == "__main__":
 
     creds: LoginCredentials = loadCredsFromEnv(envfilePath=working_dir / ".env")
 
-    authData: AuthData = performLogin(creds)
     # t_before_index: float = time.perf_counter()
 
     file_index: dict[str, int] | None = indexAlreadyDownloadedFiles(path=root_dir / str(year) / tile_id) if bool(os.getenv("S_CREATE_INDEX")) else None
@@ -66,22 +65,30 @@ if __name__ == "__main__":
 
     # set CHunk choosing
     list_split_chooser = ListSplitChoose(i=chunk_id, n=chunks)
+
+    file_names = get_filenames_for_id(tile_id=tile_id, year=year, index=file_index, list_split_chooser=list_split_chooser)
+
+    if len(file_names) == 0:
+        logger.info(f"No files left for array task {job_index}, {tile_id}, {year}, {list_split_chooser}: Exiting...")
+        sys.exit(0)
+    else: 
+        logger.info(msg=f"Found {len(file_names)} for downloading!")
+
     
+    authData: AuthData = performLogin(creds)
+
+    target_dir = root_dir / str(year) / tile_id
+
     try:
-        dl_years_for_tile(
+        dl_file_list(
             tile_id=tile_id,
-            years=[year],
-            root_dir=root_dir,
+            year=year,
+            target_dir=target_dir,
             auth=authData,
+            filename_list=file_names,
             show_live_progress=False,
-            dl_index=file_index,
-            # greater chunks for gpfs
-            chunkSize=DEFAULT_CHUNK_SIZE * 4,
-            list_split_chooser=list_split_chooser
+            chunk_size=DEFAULT_CHUNK_SIZE * 4,
+            log_time=True
         )
-    except RuntimeError as e:
-        logger.error(msg=e)
-        exit(code=1)
-    except requests.exceptions.ChunkedEncodingError as e:
-        logger.error(msg=f"Connection reset by server for tile: {tile_id} and year: {year}")
-        exit(code=1)
+    except Exception as e:
+        logger.error(msg=f"Error during fetching data. Reason: {str(e)}")

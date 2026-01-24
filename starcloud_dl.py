@@ -38,13 +38,12 @@ A = TypeVar(name="A")
 
 DEFAULT_CHUNK_SIZE: int = 1024 * 1024  # 1Mb default chunk size
 
+
 def _split_into_n(seq: list[A], n_parts: int) -> list[list[A]]:
     k, m = divmod(len(seq), n_parts)
     return [
-        seq[i*k + min(i, m):(i+1)*k + min(i+1, m)]
-        for i in range(n_parts)
+        seq[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n_parts)
     ]
-
 
 
 @dataclass
@@ -53,11 +52,7 @@ class ListSplitChoose:
     n: int
 
     def get_sublist(self, seq: list[A]) -> list[A]:
-        
         return list[list[A]](_split_into_n(seq=seq, n_parts=self.n))[self.i]
-
-
-
 
 
 def requireEnv(value: T | None, name: str = "value") -> T:
@@ -82,13 +77,13 @@ def indexAlreadyDownloadedFiles(path: Path) -> dict[str, int]:
     return fileIndex
 
 
-
 def loadCredsFromEnv(envfilePath: Path | str) -> LoginCredentials:
     if not load_dotenv(dotenv_path=envfilePath):
         raise RuntimeError(f".env file with path: '{envfilePath}' could not be found!")
     email: str = requireEnv(os.getenv("STAR_EMAIL"), "STAR_EMAIL")
     password: str = requireEnv(os.getenv("STAR_PASSWORD"), "STAR_PASSWORD")
     return LoginCredentials(email, password)
+
 
 def _getCLIArgs() -> Namespace:
     parser: ArgumentParser = argparse.ArgumentParser(
@@ -254,6 +249,39 @@ def _downloadTIFFile(
                 print()
 
 
+def dl_file_list(
+    tile_id: str, year: int, target_dir: Path, auth: AuthData, filename_list: list[str], show_live_progress: bool = True, chunk_size: int = DEFAULT_CHUNK_SIZE, log_time: bool = False
+) -> None:
+
+
+    for i, f in enumerate[str](filename_list):
+        t_file_start: float = time.perf_counter()
+
+        (filename, signedURL, _) = _getRandomAssSignedFileLink(
+            filename=f, tileName=tile_id, year=year, auth=auth
+        )
+
+        t_got_file_link: float = time.perf_counter()
+
+        _downloadTIFFile(
+            url=signedURL,
+            outDir=target_dir,
+            filename=filename,
+            i=i + 1,
+            fileCount=len(filename_list),
+            isProgressShown=show_live_progress,
+            chunkSize=chunk_size,
+        )
+
+        t_downloaded: float = time.perf_counter()
+
+        if log_time:
+            logger.info(
+                msg=f"Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s"
+            )
+        logger.info(msg=f"Successfully downloaded {filename}!")
+
+
 def dl_years_for_tile(
     tile_id: str,
     years: list[int],
@@ -273,51 +301,36 @@ def dl_years_for_tile(
 
         start_acc: float = time.perf_counter()
 
-        filenameList: list[str] = get_filenames_for_id(tile_id, year, index=dl_index, list_split_chooser=list_split_chooser)
+
+        filenameList: list[str] = get_filenames_for_id(
+            tile_id, year, index=dl_index, list_split_chooser=list_split_chooser
+        )
         if log_time:
             logger.info(
                 msg=f"Perf File List: {(time.perf_counter() - start_acc):.2f} s"
             )
 
         if len(filenameList) == 0:
-            logger.info(f"No files left for {tile_id} in {year} {list_split_chooser}. Ending download....")
+            logger.info(
+                f"No files left for {tile_id} in {year} {list_split_chooser}. Ending download...."
+            )
             return
         else:
             logger.info(
                 msg=f"Found {len(filenameList)} files for {tile_id} in year {year}! Starting download..."
             )
-        
-        for i, f in enumerate[str](filenameList):
-            t_file_start: float = time.perf_counter()
 
-            (filename, signedURL, fileSize) = _getRandomAssSignedFileLink(
-                filename=f, tileName=tile_id, year=year, auth=auth
-            )
+        dl_file_list(
+            tile_id=tile_id,
+            year=year,
+            target_dir=target_dir,
+            auth=auth,
+            filename_list=filenameList,
+            show_live_progress=show_live_progress,
+            chunk_size=chunkSize,
+            log_time=log_time
+        )
 
-            t_got_file_link: float = time.perf_counter()
-
-            if dl_index is not None and dl_index.get(filename, -1) == fileSize:
-                logger.info(
-                    msg=f"File {filename} has already been donwloaded, going to next file... "
-                )
-                continue
-            _downloadTIFFile(
-                url=signedURL,
-                outDir=target_dir,
-                filename=filename,
-                i=i + 1,
-                fileCount=len(filenameList),
-                isProgressShown=show_live_progress,
-                chunkSize=chunkSize,
-            )
-
-            t_downloaded: float = time.perf_counter()
-
-            if log_time:
-                logger.info(
-                    msg=f"Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s"
-                )
-            logger.info(msg=f"Successfully downloaded {filename}!")
 
 
 def main() -> None:
