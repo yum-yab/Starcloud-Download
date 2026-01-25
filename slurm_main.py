@@ -66,7 +66,11 @@ if __name__ == "__main__":
     # set CHunk choosing
     list_split_chooser = ListSplitChoose(i=chunk_id, n=chunks)
 
-    file_names = get_filenames_for_id(tile_id=tile_id, year=year, index=file_index, list_split_chooser=list_split_chooser)
+    try:
+        file_names = get_filenames_for_id(tile_id=tile_id, year=year, index=file_index, list_split_chooser=list_split_chooser)
+    except Exception as e:
+        logger.error(f'Error accessing file list: {str(e)}')
+        sys.exit(1)
 
     if len(file_names) == 0:
         logger.info(f"No files left for array task {job_index}, {tile_id}, {year}, {list_split_chooser}: Exiting...")
@@ -74,8 +78,11 @@ if __name__ == "__main__":
     else: 
         logger.info(msg=f"Found {len(file_names)} for downloading!")
 
-    
-    authData: AuthData = performLogin(creds)
+    try:
+        authData: AuthData = performLogin(creds)
+    except Exception as e:
+        logger.error(f'Error authenticating for star cloud: {str(e)}')
+        sys.exit(1)
 
     target_dir = root_dir / str(year) / tile_id
 

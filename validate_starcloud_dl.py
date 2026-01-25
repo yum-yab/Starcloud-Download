@@ -1,6 +1,8 @@
 import json
 import select
 
+from pandas._libs import missing
+
 from starcloud_dl import getFileListPage, indexAlreadyDownloadedFiles
 from pathlib import Path
 import polars as pl
@@ -157,7 +159,13 @@ def print_completeness_percentage(df: pl.DataFrame) -> None:
 
     completeness = comp['pct'].sum() / comp['pct'].len() * 100
 
-    print(f'Completeness: {completeness:.3f} %')
+    tiles = df.get_column('tile').unique().cast(str).to_list()
+
+    years = df.get_column('year').unique().cast(dtype=int).to_list()
+
+    missing_files = completeness_stats.filter(pl.col('status') != "complete").get_column('status').len()
+
+    print(f'Completeness for {tiles} and {years}: {completeness:.3f} %. Missing files: {missing_files}')
 
 
 
