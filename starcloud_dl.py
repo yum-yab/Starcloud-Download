@@ -15,8 +15,7 @@ from pathlib import Path
 import logging
 import sys
 import time
-import numpy as np
-
+import json
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -161,10 +160,29 @@ def get_filenames_for_id(
     year: int,
     index: dict[str, int] | None = None,
     list_split_chooser: ListSplitChoose | None = None,
+    write_resp_to_disk: Path | None = None,
 ) -> list[str]:
-    resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(
-        tileName=tile_id, year=year
-    )
+
+    if write_resp_to_disk is None:
+        resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(
+            tileName=tile_id, year=year
+        )
+    else:
+        resp_file_name = f"expected_files_{year}_{tile_id}.json"
+        target_file = (
+            write_resp_to_disk / str(year) / tile_id / resp_file_name
+            if not str(write_resp_to_disk).endswith(tile_id)
+            else write_resp_to_disk / resp_file_name
+        )
+
+        if target_file.exists() and target_file.is_file():
+            resp_json = json.loads(target_file.read_text())  # pyright: ignore[reportAny]
+        else:
+            resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(
+                tileName=tile_id, year=year
+            )
+            _ = target_file.write_text(json.dumps(resp_json))
+        
 
     list_of_file_dicts = resp_json["response"]
 
@@ -250,10 +268,15 @@ def _downloadTIFFile(
 
 
 def dl_file_list(
-    tile_id: str, year: int, target_dir: Path, auth: AuthData, filename_list: list[str], show_live_progress: bool = True, chunk_size: int = DEFAULT_CHUNK_SIZE, log_time: bool = False
+    tile_id: str,
+    year: int,
+    target_dir: Path,
+    auth: AuthData,
+    filename_list: list[str],
+    show_live_progress: bool = True,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    log_time: bool = False,
 ) -> None:
-
-
     for i, f in enumerate[str](filename_list):
         t_file_start: float = time.perf_counter()
 
@@ -301,7 +324,6 @@ def dl_years_for_tile(
 
         start_acc: float = time.perf_counter()
 
-
         filenameList: list[str] = get_filenames_for_id(
             tile_id, year, index=dl_index, list_split_chooser=list_split_chooser
         )
@@ -328,9 +350,8 @@ def dl_years_for_tile(
             filename_list=filenameList,
             show_live_progress=show_live_progress,
             chunk_size=chunkSize,
-            log_time=log_time
+            log_time=log_time,
         )
-
 
 
 def main() -> None:
