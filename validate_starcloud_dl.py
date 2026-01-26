@@ -86,9 +86,18 @@ def validate_tile_year(
 
     res: list[dict[str, str | int]] = []
 
-    response: dict[str, list[dict[str, int | str]]] = getFileListPage(
-        tileName=tile_id, year=year
-    )
+    expected_files_path = path / f"expected_files_{year}_{tile_id}.json"
+
+    if expected_files_path.exists() and expected_files_path.is_file():
+        response = json.loads(expected_files_path.read_text())
+    else:
+
+        print(f"Could not find expected files for {year} and {tile_id}. Downloading list...")
+        response: dict[str, list[dict[str, int | str]]] = getFileListPage(
+            tileName=tile_id, year=year
+        )
+
+        _ = expected_files_path.write_text(json.dumps(response))
 
     should_mapping: dict[str, int] = {
         d["file"]: int(d["size"]) for d in response["response"]
@@ -148,26 +157,29 @@ def validate_year(path: Path, year: int, print_stats: bool = True) -> pl.DataFra
 
 
 def print_completeness_percentage(df: pl.DataFrame) -> None:
-
-    completeness_stats = df.group_by(['year', 'tile', 'status']).len().with_columns(
-        (pl.col('len') / pl.sum('len').over(['year', 'tile'])).alias("pct")
+    completeness_stats = (
+        df.group_by(["year", "tile", "status"])
+        .len()
+        .with_columns(
+            (pl.col("len") / pl.sum("len").over(["year", "tile"])).alias("pct")
+        )
     )
 
-    comp = completeness_stats.filter(
-        (pl.col('status') == "complete") 
+    comp = completeness_stats.filter((pl.col("status") == "complete"))
+
+    completeness = (
+        comp["pct"].sum() / comp["pct"].len() * 100 if comp["pct"].len() != 0 else 0.0
     )
 
-    completeness = comp['pct'].sum() / comp['pct'].len() * 100
+    tiles = df.get_column("tile").unique().cast(str).to_list()
 
-    tiles = df.get_column('tile').unique().cast(str).to_list()
+    years = df.get_column("year").unique().cast(dtype=int).to_list()
 
-    years = df.get_column('year').unique().cast(dtype=int).to_list()
+    missing_files = df.filter(pl.col("status") != "complete").get_column("status").len()
 
-    missing_files = completeness_stats.filter(pl.col('status') != "complete").get_column('status').len()
-
-    print(f'Completeness for {tiles} and {years}: {completeness:.3f} %. Missing files: {missing_files}')
-
-
+    print(
+        f"Completeness for {tiles} and {years}: {completeness:.3f} %. Missing files: {missing_files}"
+    )
 
 
 if __name__ == "__main__":
@@ -197,7 +209,10 @@ if __name__ == "__main__":
 
     if len(years_to_check) == 1:
         incomplete_tiles: list[str] = (
-            final_df.filter(pl.col('status') != 'complete').get_column('tile').unique().to_list()
+            final_df.filter(pl.col("status") != "complete")
+            .get_column("tile")
+            .unique()
+            .to_list()
         )
 
         print(f"Incomplete tiles: {json.dumps(obj=incomplete_tiles)}")
