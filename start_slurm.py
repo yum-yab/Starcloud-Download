@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import polars as pl
 import argparse
 
-from validate_starcloud_dl import incomplete_tiles, validate_year
+from validate_starcloud_dl import validate_year
 
 
 def fetch_missing_tiles(path: Path, year: int) -> list[str]:
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     # --- Build sbatch command ---
     bash_wrapper: Path = Path(__file__).parent / "slurm_wrapper.sh"
 
-    limit_concurrent = int(os.getenv("S_LIMIT_CONCURRENT", 10))
+    limit_concurrent = int(os.getenv("S_LIMIT_CONCURRENT", 5))
 
     job_name = f"csdc_dl_{'_'.join(map(str, years))}"
 
