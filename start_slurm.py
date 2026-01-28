@@ -95,7 +95,7 @@ if __name__ == "__main__":
         "--slurm-years",
         *[str(y) for y in years],
         "--slurm-tiles",
-        f"'{json.dumps(tiles)}'",
+        f"{json.dumps(tiles)}",
     ]
 
     # --- Submit job ---
