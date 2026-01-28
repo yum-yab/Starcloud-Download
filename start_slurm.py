@@ -94,7 +94,7 @@ if __name__ == "__main__":
         str(bash_wrapper),
         "--slurm-years",
         *[str(y) for y in years],
-        "--slurm_tiles",
+        "--slurm-tiles",
         f"'{json.dumps(tiles)}'",
     ]
 
