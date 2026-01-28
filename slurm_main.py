@@ -16,7 +16,7 @@ import itertools
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
-import requests
+import argparse
 import sys
 
 # --- Load .env ---
@@ -35,15 +35,43 @@ logging.basicConfig(
 logger: Logger = logging.getLogger(name=__name__)
 
 
+
+def parse_args() -> tuple[list[int], list[str]]:
+    parser = argparse.ArgumentParser()
+    _ = parser.add_argument(
+        "--slurm-years",
+        type=int,
+        nargs="+",
+        required=True,
+        help="One or more years (e.g. --slurm-years 2024 2025)",
+    )
+    _ = parser.add_argument(
+        "--slurm-tiles",
+        type=json.loads,
+        required=True,
+        help='JSON array of tiles (e.g. --slurm-tiles \'["tileA","tileB"]\')',
+    )
+
+    args = parser.parse_args()
+
+    slurm_years: list[int] = args.slurm_years
+    slurm_tiles: list[str] = args.slurm_tiles
+
+    return slurm_years, slurm_tiles
+
 if __name__ == "__main__":
     if (
-        "S_TILES" not in os.environ
-        or "S_YEARS" not in os.environ
-        or "S_ROOT_DIR" not in os.environ
+        # "S_TILES" not in os.environ
+        # or "S_YEARS" not in os.environ
+        # or "S_ROOT_DIR" not in os.environ
+        "S_ROOT_DIR" not in os.environ
     ):
         raise RuntimeError(
-            "If executed by slurm the tasks need to know which keys are handled! S_ROOT_DIR, S_HANDLED_TILES and S_HANDLED_YEARS need to be set need to be set!"
+            # "If executed by slurm the tasks need to know which keys are handled! S_ROOT_DIR, S_HANDLED_TILES and S_HANDLED_YEARS need to be set need to be set!"
+            "If executed by slurm the tasks need to know which keys are handled! S_ROOT_DIR need to be set need to be set!"
         )
+
+    slurm_years, slurm_tiles = parse_args()
 
     chunks = int(os.getenv("S_SPLIT_FILES", "1"))
 
@@ -57,8 +85,8 @@ if __name__ == "__main__":
     else:
         job_index: int = int(slurm_array_job_id)
 
-    slurm_tiles: list[str] = json.loads(s=os.environ["S_TILES"])
-    slurm_years: list[int] = json.loads(s=os.environ["S_YEARS"])
+    
+
 
     tile_id, year, chunk_id = list[tuple[str, int, int]](
         itertools.product(slurm_tiles, slurm_years, range(chunks))

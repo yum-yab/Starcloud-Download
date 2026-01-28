@@ -79,31 +79,33 @@ GERMAN_TILES: list[str] = [
 
 
 def validate_tile_year(
-    path: Path, year: int, tile_id: str, print_stats: bool = True
+    path_year: Path, year: int, tile_id: str, print_stats: bool = True
 ) -> pl.DataFrame:
-    if str(path).endswith(tile_id):
-        path: Path = path / tile_id
+    
+    year_tile_path: Path = path_year / tile_id
+
 
     res: list[dict[str, str | int]] = []
 
-    expected_files_path = path / f"expected_files_{year}_{tile_id}.json"
+    expected_files_path = year_tile_path / f"expected_files_{year}_{tile_id}.json"
 
     if expected_files_path.exists() and expected_files_path.is_file():
         response = json.loads(expected_files_path.read_text())
     else:
 
-        print(f"Could not find expected files for {year} and {tile_id}. Downloading list...")
+        print(f"Could not find expected files {expected_files_path} {year} and {tile_id}. Downloading list...")
         response: dict[str, list[dict[str, int | str]]] = getFileListPage(
             tileName=tile_id, year=year
         )
 
+        if not year_tile_path.exists():
+            year_tile_path.mkdir(parents=True, exist_ok=True)
         _ = expected_files_path.write_text(json.dumps(response))
 
     should_mapping: dict[str, int] = {
         d["file"]: int(d["size"]) for d in response["response"]
     }  # pyright: ignore[reportAssignmentType]
 
-    year_tile_path: Path = path / tile_id
 
     is_mapping: dict[str, int] = indexAlreadyDownloadedFiles(path=year_tile_path)
 
@@ -141,7 +143,7 @@ def validate_year(path: Path, year: int, print_stats: bool = True) -> pl.DataFra
     for tile_id in GERMAN_TILES:
         try:
             tile_df: pl.DataFrame = validate_tile_year(
-                path=index_path, year=year, tile_id=tile_id, print_stats=print_stats
+                path_year=index_path, year=year, tile_id=tile_id, print_stats=print_stats
             )
         except Exception as e:
             print(f"ERROR: Could not validate {year}, {tile_id}. Reason: {str(e)}")
@@ -173,12 +175,17 @@ def print_completeness_percentage(df: pl.DataFrame) -> None:
 
     tiles = df.get_column("tile").unique().cast(str).to_list()
 
+    if len(tiles) > 5:
+        tiles_str = str(len(tiles))
+    else:
+        tiles_str = json.dumps(tiles)
+
     years = df.get_column("year").unique().cast(dtype=int).to_list()
 
     missing_files = df.filter(pl.col("status") != "complete").get_column("status").len()
 
     print(
-        f"Completeness for {tiles} and {years}: {completeness:.3f} %. Missing files: {missing_files}"
+        f"Completeness for {tiles_str} tiles and {years}: {completeness:.3f} %. Missing files: {missing_files}"
     )
 
 

@@ -18,4 +18,4 @@ else
 fi
 
 # --- Execute Python script ---
-python slurm_main.py
+python slurm_main.py "$@"
