@@ -207,7 +207,12 @@ if __name__ == "__main__":
 
     final_df = pl.concat(dfs)
 
-    file_name: str = (
+    report_dir = Path("./completeness_reports")
+
+    if not report_dir.exists():
+        report_dir.mkdir()
+
+    file_name  = report_dir / (
         f"csdc_dl_completeness_{time_str}_{'_'.join(map(str, years_to_check))}.csv"
     )
 

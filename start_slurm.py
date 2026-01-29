@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-from typing import Any
-
+import sys
 
 import os
 import json
@@ -59,6 +58,11 @@ if __name__ == "__main__":
         unique_tiles = list(set(tiles + incomplete_tiles))
 
         tiles = unique_tiles
+
+    if len(tiles) == 0:
+        print(f"No tiles missing, year(s) {years} are fully downloaded!")
+        sys.exit(0)
+
 
     print(f"Found unique missing tiles for years: {tiles}")
 
