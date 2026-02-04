@@ -11,7 +11,7 @@ import os
 
 
 def fetch_missing_files(path: Path, year: int) -> pl.DataFrame:
-    df = validate_year(path=path, year=year, print_stats=True)
+    df = validate_year(path=path, year=year, print_stats=False)
 
     result = df.filter(pl.col("status") != "complete")
 
@@ -60,13 +60,18 @@ if __name__ == "__main__":
 
     print(f"Missing files for {len(years)} years: {missing_files_df.height}")
 
+
+    if missing_files_df.height == 0:
+        print("No missung files, nothing to do!")
+        sys.exit(0)
+
     try:
         authData: AuthData = performLogin(creds)
     except Exception as e:
         print(f"Error authenticating for star cloud: {str(e)}")
         sys.exit(1)
 
-    for tile_id, year, fname in missing_files_df.iter_rows():
+    for _, tile_id, year, fname in missing_files_df.iter_rows():
         target_dir = root_dir / str(year) / tile_id
 
         try:

@@ -72,7 +72,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
 
-    print(f"Found unique missing tiles for years: {tiles}")
+    print(f"Found {len(tiles)}  unique missing tiles for years: {tiles}")
 
     chunks = int(os.getenv("S_SPLIT_FILES", "4"))
 
