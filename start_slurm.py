@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import polars as pl
 import argparse
 
-from validate_starcloud_dl import validate_year
+from validate_starcloud_dl import validate_year, GERMAN_TILES
 
 
 def fetch_missing_tiles(path: Path, year: int) -> list[str]:
@@ -22,7 +22,7 @@ def fetch_missing_tiles(path: Path, year: int) -> list[str]:
     return incomplete_tiles
 
 
-def parse_args() -> list[int]:
+def parse_args() -> tuple[list[int], bool]:
     parser = argparse.ArgumentParser()
     _ = parser.add_argument(
         "--slurm-years",
@@ -32,11 +32,15 @@ def parse_args() -> list[int]:
         help="One or more years (e.g. --slurm-years 2024 2025)",
     )
 
+    _ = parser.add_argument("--alltiles", action="store_true")
+
     args = parser.parse_args()
 
     slurm_years: list[int] = args.slurm_years
 
-    return slurm_years
+    alltiles: bool = args.alltiles
+
+    return slurm_years, alltiles
 
 
 if __name__ == "__main__":
@@ -48,16 +52,20 @@ if __name__ == "__main__":
 
     # --- Load S_TILES and S_YEARS ---
 
-    years = parse_args()
+    years, alltiles = parse_args()
 
     tiles: list[str] = []
 
-    for y in years:
-        incomplete_tiles = fetch_missing_tiles(root_dir / str(y), y)
 
-        unique_tiles = list(set(tiles + incomplete_tiles))
+    if alltiles:
+        tiles = GERMAN_TILES
+    else:
+        for y in years:
+            incomplete_tiles = fetch_missing_tiles(root_dir / str(y), y)
 
-        tiles = unique_tiles
+            unique_tiles = list(set(tiles + incomplete_tiles))
+
+            tiles = unique_tiles
 
     if len(tiles) == 0:
         print(f"No tiles missing, year(s) {years} are fully downloaded!")

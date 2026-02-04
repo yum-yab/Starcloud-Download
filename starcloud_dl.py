@@ -162,7 +162,6 @@ def get_filenames_for_id(
     list_split_chooser: ListSplitChoose | None = None,
     write_resp_to_disk: Path | None = None,
 ) -> list[str]:
-
     if write_resp_to_disk is None:
         resp_json: dict[str, list[dict[str, int | str]]] = getFileListPage(
             tileName=tile_id, year=year
@@ -182,7 +181,6 @@ def get_filenames_for_id(
                 tileName=tile_id, year=year
             )
             _ = target_file.write_text(json.dumps(resp_json))
-        
 
     list_of_file_dicts = resp_json["response"]
 
@@ -235,8 +233,6 @@ def _downloadTIFFile(
     url: str,
     outDir: Path,
     filename: str,
-    i: int,
-    fileCount: int,
     isProgressShown: bool = True,
     chunkSize: int = DEFAULT_CHUNK_SIZE,
 ) -> None:
@@ -247,7 +243,7 @@ def _downloadTIFFile(
     #     )
     downloaded = 0
     if not isProgressShown:
-        logger.debug(f"[{i}/{fileCount}] Downloading {filename}")
+        logger.debug(f"Downloading {filename}")
 
     with requests.get(url, stream=True) as response:
         response.raise_for_status()
@@ -260,11 +256,46 @@ def _downloadTIFFile(
                     downloaded += len(chunk)
                     if isProgressShown:
                         print(
-                            f"\r[{i}/{fileCount}] Downloading {filename}: {round(downloaded / total * 100, 2)} %",
+                            f"\rDownloading {filename}: {round(downloaded / total * 100, 2)} %",
                             end="",
                         )
             if isProgressShown:
                 print()
+
+
+def dl_file_by_id(
+    tile_id: str,
+    year: int,
+    target_dir: Path,
+    auth: AuthData,
+    filename: str,
+    show_live_progress: bool = True,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    log_time: bool = False,
+) -> None:
+    t_file_start: float = time.perf_counter()
+
+    (filename, signedURL, _) = _getRandomAssSignedFileLink(
+        filename=filename, tileName=tile_id, year=year, auth=auth
+    )
+
+    t_got_file_link: float = time.perf_counter()
+
+    _downloadTIFFile(
+        url=signedURL,
+        outDir=target_dir,
+        filename=filename,
+        isProgressShown=show_live_progress,
+        chunkSize=chunk_size,
+    )
+
+    t_downloaded: float = time.perf_counter()
+
+    if log_time:
+        logger.info(
+            msg=f"Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s"
+        )
+    logger.info(msg=f"Successfully downloaded {filename}!")
 
 
 def dl_file_list(
@@ -277,32 +308,17 @@ def dl_file_list(
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     log_time: bool = False,
 ) -> None:
-    for i, f in enumerate[str](filename_list):
-        t_file_start: float = time.perf_counter()
-
-        (filename, signedURL, _) = _getRandomAssSignedFileLink(
-            filename=f, tileName=tile_id, year=year, auth=auth
+    for _, f in enumerate[str](filename_list):
+        dl_file_by_id(
+            tile_id=tile_id,
+            year=year,
+            target_dir=target_dir,
+            auth=auth,
+            filename=f,
+            show_live_progress=show_live_progress,
+            chunk_size=chunk_size,
+            log_time=log_time,
         )
-
-        t_got_file_link: float = time.perf_counter()
-
-        _downloadTIFFile(
-            url=signedURL,
-            outDir=target_dir,
-            filename=filename,
-            i=i + 1,
-            fileCount=len(filename_list),
-            isProgressShown=show_live_progress,
-            chunkSize=chunk_size,
-        )
-
-        t_downloaded: float = time.perf_counter()
-
-        if log_time:
-            logger.info(
-                msg=f"Perf FileLink,Download: {(t_got_file_link - t_file_start):.2f}, {(t_downloaded - t_got_file_link):.2f} s"
-            )
-        logger.info(msg=f"Successfully downloaded {filename}!")
 
 
 def dl_years_for_tile(
