@@ -2,7 +2,7 @@ from pathlib import Path
 
 from requests import auth
 from sc_login import AuthData, LoginCredentials, performLogin
-from starcloud_dl import dl_file_by_id
+from starcloud_dl import DEFAULT_CHUNK_SIZE, dl_file_by_id
 from validate_starcloud_dl import validate_year
 import argparse
 import polars as pl
@@ -16,7 +16,7 @@ def fetch_missing_files(path: Path, year: int) -> pl.DataFrame:
     result = df.filter(pl.col("status") != "complete")
 
     if result.height > 0:
-        print(f'Missing files for year {year}: {result.height}')
+        print(f"Missing files for year {year}: {result.height}")
     return result
 
 
@@ -34,22 +34,18 @@ def parse_args() -> list[int]:
 
     slurm_years: list[str] = args.slurm_years
 
-
-    if len(slurm_years) == 1 and '-' in slurm_years[0]:
-
-        start, end = map(int, slurm_years[0].split('-'))
+    if len(slurm_years) == 1 and "-" in slurm_years[0]:
+        start, end = map(int, slurm_years[0].split("-"))
 
         return list(range(start, end))
     else:
         return list(map(int, slurm_years))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
 
     years = parse_args()
-
-
 
     env_path = Path(__file__).parent / ".env"
     load_dotenv(env_path)
@@ -62,9 +58,7 @@ if __name__ == '__main__':
 
     missing_files_df = pl.concat([fetch_missing_files(root_dir, y) for y in years])
 
-
     print(f"Missing files for {len(years)} years: {missing_files_df.height}")
-
 
     try:
         authData: AuthData = performLogin(creds)
@@ -72,16 +66,18 @@ if __name__ == '__main__':
         print(f"Error authenticating for star cloud: {str(e)}")
         sys.exit(1)
 
-    
     for tile_id, year, fname in missing_files_df.iter_rows():
-
         target_dir = root_dir / str(year) / tile_id
 
-        dl_file_by_id(
-            tile_id=tile_id,
-            year=year,
-            auth=authData,
-            filename=fname,
-            target_dir=target_dir,
-            show_live_progress=True,
-        )
+        try:
+            dl_file_by_id(
+                tile_id=tile_id,
+                year=year,
+                auth=authData,
+                filename=fname,
+                target_dir=target_dir,
+                show_live_progress=True,
+                chunk_size=DEFAULT_CHUNK_SIZE * 4,
+            )
+        except Exception as e:
+            print(f"Failed to download file to {target_dir / fname}! Reason: {e}")
