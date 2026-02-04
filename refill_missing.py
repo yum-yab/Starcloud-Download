@@ -71,7 +71,9 @@ if __name__ == "__main__":
         print(f"Error authenticating for star cloud: {str(e)}")
         sys.exit(1)
 
-    for _, tile_id, year, fname in missing_files_df.iter_rows():
+    for row in missing_files_df.iter_rows(named=True):
+
+        year, tile_id, fname = (row['year'], row['tile'], row['filename'])
         target_dir = root_dir / str(year) / tile_id
 
         try:
