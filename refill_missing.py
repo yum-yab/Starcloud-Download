@@ -20,32 +20,41 @@ def fetch_missing_files(path: Path, year: int) -> pl.DataFrame:
     return result
 
 
-def parse_args() -> list[int]:
+def parse_args() -> tuple[list[int], bool]:
     parser = argparse.ArgumentParser()
+
     _ = parser.add_argument(
         "--slurm-years",
         type=str,
         nargs="+",
         required=True,
-        help="One or more years (e.g. --slurm-years 2024 2025)",
+        help="One or more years (e.g. --slurm-years 2024 2025 or 2024-2026)",
+    )
+
+    _ = parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Enable check mode (default: False)",
     )
 
     args = parser.parse_args()
 
     slurm_years: list[str] = args.slurm_years
+    check: bool = args.check
 
     if len(slurm_years) == 1 and "-" in slurm_years[0]:
         start, end = map(int, slurm_years[0].split("-"))
-
-        return list(range(start, end))
+        years = list(range(start, end))
     else:
-        return list(map(int, slurm_years))
+        years = list(map(int, slurm_years))
+
+    return years, check
 
 
 if __name__ == "__main__":
     import sys
 
-    years = parse_args()
+    years, just_check = parse_args()
 
     env_path = Path(__file__).parent / ".env"
     load_dotenv(env_path)
@@ -58,8 +67,14 @@ if __name__ == "__main__":
 
     missing_files_df = pl.concat([fetch_missing_files(root_dir, y) for y in years])
 
-    print(f"Missing files for {len(years)} years: {missing_files_df.height}")
 
+    missing_tiles = missing_files_df.get_column('tile').unique().len()
+
+    print(f"Missing files for {len(years)} years ({missing_tiles} diff. tiles missing): {missing_files_df.height}")
+
+
+    if just_check:
+        sys.exit(0)
 
     if missing_files_df.height == 0:
         print("No missung files, nothing to do!")
